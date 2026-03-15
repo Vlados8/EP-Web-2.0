@@ -60,7 +60,7 @@ interface UICategory {
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://admin.empire-premium.de/api/v1";
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "ep_71089631cd09ba8d4fe00f726af56ed90aa23c5eb0988647";
 
 const iconMap: Record<string, React.ReactNode> = {
     "Photovoltaik (PV)": <SolarPanel className="w-8 h-8" />,
