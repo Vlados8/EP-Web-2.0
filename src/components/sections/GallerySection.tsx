@@ -4,13 +4,13 @@ const projects = [
     {
         title: "Villa Lumina",
         description: "Nachhaltiges Design mit maximaler Solarenergie-Integration.",
-        image: "/c:/Users/vlado/.gemini/antigravity/brain/1021506e-1859-47e9-b7d9-217ed3cc54d9/modern_eco_house_exterior_1772911079968.png",
+        image: "/projects/exterior.png",
         category: "Exterieur"
     },
     {
         title: "Modern Zen",
         description: "Minimalistisches Interieur mit intelligenter Lichtsteuerung.",
-        image: "/c:/Users/vlado/.gemini/antigravity/brain/1021506e-1859-47e9-b7d9-217ed3cc54d9/modern_eco_house_interior_1772911093770.png",
+        image: "/projects/interior.png",
         category: "Interieur"
     }
 ];
