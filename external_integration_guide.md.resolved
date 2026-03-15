@@ -1,0 +1,147 @@
+# API Integration Guide: Externe Website anbinden
+
+Dieses Dokument beschreibt, wie eine externe Website (z. B. auf Basis von WordPress, Next.js, etc.) Daten direkt an die CRM-Datenbank senden kann. Es behandelt zwei Hauptbereiche: 
+1. **Daten abrufen (Kategorien, Fragen)**
+2. **Intelligente Formulare (Anfragen / Inquiries)**
+3. **Support & Mängelmeldungen (Tickets)**
+
+---
+
+## 1. Daten abrufen (Kategorien, Unterkategorien & Fragen)
+
+Bevor der Nutzer das Formular ausfüllen kann, muss die externe Seite wissen, welche Kategorien und Fragen existieren. Das Admin-Panel stellt hierfür Endpunkte zur Verfügung.
+
+### Kategorien, Unterkategorien & Fragen abrufen
+- **URL**: `GET /api/v1/categories`
+- **Was es zurückgibt**: Einen kompletten Baum (Tree) mit allen Hauptkategorien, deren Unterkategorien und den zugehörigen Fragen mit Antwortmöglichkeiten.
+
+#### Beispiel-Antwort (JSON)
+```json
+{
+  "status": "success",
+  "data": {
+    "categories": [
+      {
+        "id": 1,
+        "name": "Dachsanierung",
+        "subcategories": [
+          {
+            "id": 2,
+            "name": "Flachdach",
+            "questions": [
+              {
+                "id": 10,
+                "question_text": "Wie groß ist die Dachfläche?",
+                "field_type": "radio", // oder "text", "checkbox"
+                "answers": [
+                  {
+                    "id": 25,
+                    "answer_text": "Unter 50qm"
+                  },
+                  {
+                    "id": 26,
+                    "answer_text": "Über 50qm"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Ablauf für die externe Seite:**
+1. Rufen Sie einmalig `GET /api/v1/categories` beim Laden des Formulars ab.
+2. Bauen Sie den Wizard dynamisch auf Basis dieser Struktur auf.
+3. Wenn der Besucher z. B. auf "Dachsanierung" klickt, schauen Sie in die geladene JSON-Struktur, navigieren in das `subcategories`-Array und zeigen die nächste Auswahl an (z. B. "Flachdach").
+4. Anschliessend zeigen Sie die passenden `questions` für diese Auswahl an.
+
+---
+
+## 2. Intelligente Formulare (Anfragen)
+
+Wenn ein Nutzer das Formular auf der externen Website ausfüllt, müssen die Daten an den `/api/v1/inquiries`-Endpunkt gesendet werden. Dieser Endpunkt speichert sowohl die Basisdaten des Kunden als auch die spezifischen Antworten auf die Fragen des Formulars.
+
+### Endpoint
+- **URL**: `POST /api/v1/inquiries`
+- **Content-Type**: `application/json`
+
+### Payload-Struktur (JSON)
+
+```json
+{
+  "company_id": "UUID-der-Firma", // Optional: Falls nicht gegeben, wird die erste Firma in der DB genutzt
+  "title": "Titel der Anfrage (z.B. 'Neue Dachsanierung')", // Erforderlich
+  "category_id": 1, // Erforderlich: ID der gewählten Hauptkategorie
+  "subcategory_id": 2, // Optional: ID der Unterkategorie
+  "contact_name": "Max Mustermann", // Erforderlich: Vor- und Nachname
+  "contact_email": "max@beispiel.de", // Erforderlich/Optional je nach gewünschtem Pflichtfeld
+  "contact_phone": "+49 151 12345678", // Erforderlich/Optional
+  "location": "Musterstraße 1, 12345 Stadt", // Optional: Standort/Adresse
+  "notes": "Optionale Freitext-Notizen vom Kunden", // Optional
+  
+  // Array der beantworteten Formular-Fragen
+  "answers": [
+    {
+      "question_id": 1, // ID der Frage im CRM
+      "answer_id": 5, // Optional: ID der vordefinierten Antwort (falls Multiple Choice)
+      "answer_value": "Ja, ich brauche eine Beratung" // Optional: Freitext-Antwort
+    },
+    {
+      "question_id": 2,
+      "answer_value": "Ca. 50 Quadratmeter"
+    }
+  ]
+}
+```
+
+### So funktioniert es auf der externen Seite:
+1. Das externe Frontend ruft (über eine API oder statisch) die verfügbaren [Categories](file:///c:/Users/vlado/Desktop/admin/backend/src/infrastructure/controllers/CategoryController.js#4-43), `Subcategories` und `Questions` ab.
+2. Der Nutzer klickt sich durch das Formular (Wizard) und beantwortet die Fragen.
+3. Am Ende gibt der Nutzer seine Kontaktdaten ein.
+4. Das Formular sammelt alle Daten (ausgewählte IDs, Texte, Kontaktdaten) und sendet sie als ein gebündeltes JSON-Objekt an den oben genannten Endpunkt.
+5. Das Admin-Panel empfängt die Anfrage und sie erscheint in der Liste "Anfragen".
+
+---
+
+## 3. Support & Mängelmeldungen
+
+Wenn ein Kunde oder Nutzer einen Mangel oder ein Problem auf der Website melden möchte, wird dies als Support-Ticket erfasst. Es wird **kein** separater Kunde in der Datenbank erstellt, sondern die Kontaktdaten werden direkt an das Ticket angehängt.
+
+### Endpoint
+- **URL**: `POST /api/v1/support`
+- **Content-Type**: `application/json`
+
+### Payload-Struktur (JSON)
+
+```json
+{
+  "company_id": "UUID-der-Firma", // Erforderlich: Normalerweise statisch im Frontend hinterlegt
+  "subject": "Kurze Beschreibung des Problems (z.B. 'Fenster klemmt')", // Erforderlich: Betreff
+  "description": "Detaillierte Fehlerbeschreibung...", // Erforderlich: Text des Kunden
+  "priority": "normal", // Optional: 'low', 'normal', 'high', 'urgent' (Standard: 'normal')
+  
+  // Kundendaten
+  "client_name": "Max Mustermann", // Optional, aber empfohlen
+  "client_email": "max@beispiel.de", // Optional, aber empfohlen
+  "client_phone": "+49 151 12345678", // Optional
+  
+  // Verknüpfungen (Optional)
+  "project_id": "UUID-des-Projekts", // Falls der Kunde das Ticket direkt aus einem spezifischen Projekt heraus erstellt
+  "client_id": 10 // Falls der Kunde bereits eingeloggt ist und seine ID bekannt ist
+}
+```
+
+### So funktioniert es auf der externen Seite:
+1. Der Nutzer füllt ein einfaches Formular mit Betreff, Beschreibung und seinen Kontaktdaten aus.
+2. Die externe Seite sendet einen `POST`-Request.
+3. Das Ticket wird im Admin-Panel unter "Support" gelistet. 
+4. Wenn ein Administrator auf das Ticket antwortet, wird dies lokalisiert gespeichert und kann (in einer zukünftigen Erweiterung) per E-Mail an den Kunden gesendet werden.
+
+---
+
+### Sicherheit & CORS
+Wenn die externe Website auf einer anderen Domain (z.B. `www.meine-firma.de`) liegt als das Backend (`ep-admin-panel-20-production.up.railway.app`)
